@@ -6,7 +6,7 @@ import { firebaseConfig } from './firebase-config.js';
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { initializeFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { initializeFirestore, collection, doc, setDoc, onSnapshot, getDocs, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { CHECKLIST_CATEGORIES, LUGGAGE_META, CHECKLIST_TEMPLATE } from './checklist-data.js';
 
 createApp({
@@ -34,11 +34,11 @@ createApp({
         const joinTripUrl = ref('');
 
         const errorMap = {
-            'not-configured': '尚未設定 Firebase：請編輯 firebase-config.js，填入你自己的 Firebase 專案設定（步驟見 README）。',
             'unavailable': '無法連線到伺服器，請檢查網路。',
             'permission-denied': '存取被拒絕，請確認您有權限。',
             'not-found': '找不到此行程，可能已被刪除。',
-            'resource-exhausted': '配額已滿，請稍後再試。'
+            'resource-exhausted': '配額已滿，請稍後再試。',
+            'not-configured': '尚未設定 Firebase：請編輯 firebase-config.js，填入你自己的 Firebase 專案設定（步驟見 README）。'
         };
 
         const dbErrorMessage = computed(() => errorMap[dbErrorCode.value] || `發生未知錯誤 (${dbErrorCode.value})`);
@@ -383,6 +383,59 @@ createApp({
             localStorage.setItem('travel_app_index', JSON.stringify(tripList.value));
         };
 
+        // ---- 所有旅程（伺服器全量清單；抽屜首開時一次撈取，session 內快取）----
+        const allTrips = ref([]);
+        const allTripsStatus = ref('idle'); // idle | loading | error | ready
+        const showArchivedTrips = ref(false);
+        const loadAllTrips = async () => {
+            if (!db) return;
+            allTripsStatus.value = 'loading';
+            try {
+                const snap = await getDocs(collection(db, 'trips'));
+                allTrips.value = snap.docs.map(d => {
+                    const data = d.data();
+                    const s = data.setup || {};
+                    return {
+                        id: d.id,
+                        destination: s.destination || '',
+                        startDate: s.startDate || '',
+                        daysCount: Number(s.days) || (data.days ? data.days.length : 0),
+                        users: data.users || '',
+                        archived: !!data.archived
+                    };
+                }).sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+                allTripsStatus.value = 'ready';
+            } catch (e) {
+                console.error('Load all trips failed', e);
+                allTripsStatus.value = 'error';
+            }
+        };
+        const otherTrips = computed(() => allTrips.value.filter(t => !t.archived && !tripList.value.some(m => m.id === t.id)));
+        const archivedTrips = computed(() => allTrips.value.filter(t => t.archived));
+        // 點卡片＝加入我的旅程並開啟
+        const adoptTrip = (t) => {
+            if (!tripList.value.some(m => m.id === t.id)) {
+                tripList.value.unshift({ id: t.id, destination: t.destination, startDate: t.startDate, daysCount: t.daysCount });
+                saveTripList();
+            }
+            switchTrip(t.id);
+        };
+        const unarchiveTrip = async (t) => {
+            if (db) {
+                try {
+                    await setDoc(doc(db, 'trips', t.id), { archived: false }, { merge: true });
+                } catch (e) {
+                    console.error('Unarchive failed', e);
+                    showToast('取回失敗，請再試一次', { icon: 'ph-bold ph-warning' });
+                    return;
+                }
+            }
+            t.archived = false;
+            showToast('已取回旅程', { icon: 'ph-bold ph-box-arrow-up' });
+            adoptTrip(t);
+        };
+        watch(showTripMenu, (v) => { if (v && allTripsStatus.value === 'idle') loadAllTrips(); });
+
         const createNewTrip = () => {
             ignoreRemoteUpdate = true; // Prevent saving these resets to the current trip
             if (timeout) { clearTimeout(timeout); timeout = null; } // 取消舊旅程待存檔
@@ -547,21 +600,23 @@ createApp({
             });
         };
 
-        const deleteTrip = async (id) => {
-            const ok = await appConfirm('整份行程與記帳將一併刪除，無法復原。', { title: '刪除旅程', danger: true, confirmText: '永久刪除' });
-            if (!ok) return;
-            // 1. Remove from local list
-            tripList.value = tripList.value.filter(t => t.id !== id);
-            saveTripList();
-
-            // 2. Remove from Firestore
-            if (db) {
-                try {
-                    await deleteDoc(doc(db, 'trips', id));
-                } catch (e) {
-                    console.error("Delete failed", e);
+        // 封存制：全 app 無真刪路徑，只標 archived 狀態（資料永留伺服器，可從「所有旅程」取回）。
+        // 可逆動作照站內慣例：不彈確認，直接做＋undo toast（我的旅程、所有旅程兩處卡片共用）。
+        const archiveTrip = (id) => {
+            const idx = tripList.value.findIndex(t => t.id === id);
+            const meta = idx !== -1 ? tripList.value.splice(idx, 1)[0] : null;
+            if (meta) saveTripList();
+            const cached = allTrips.value.find(t => t.id === id);
+            if (cached) cached.archived = true;
+            // merge 只動旗標，不碰行程內容
+            if (db) setDoc(doc(db, 'trips', id), { archived: true }, { merge: true }).catch(e => console.error('Archive failed', e));
+            showToast('已封存旅程', {
+                icon: 'ph-bold ph-archive-box', undo: () => {
+                    if (meta) { tripList.value.splice(Math.min(idx, tripList.value.length), 0, meta); saveTripList(); }
+                    if (cached) cached.archived = false;
+                    if (db) setDoc(doc(db, 'trips', id), { archived: false }, { merge: true }).catch(e => console.error('Unarchive failed', e));
                 }
-            }
+            });
 
             // 3. Handle UI switch
             if (currentTripId.value === id) {
@@ -616,7 +671,9 @@ createApp({
                 isDataLoading.value = false;
                 dbError.value = false;
                 if (docSnap.exists()) {
-                    if (timeout) clearTimeout(timeout); // Clear any pending local saves
+                    // 本地有待存變更時跳過遠端快照（含自己存檔的 ACK echo）：整份文件 last-writer-wins，
+                    // 稍後 setDoc 會把待存版本蓋上去；砍計時器再套遠端會吃掉 debounce 窗內的變更
+                    if (timeout) return;
                     ignoreRemoteUpdate = true;
                     const data = docSnap.data();
 
@@ -728,6 +785,7 @@ createApp({
         const debouncedSave = () => {
             if (timeout) clearTimeout(timeout);
             timeout = setTimeout(async () => {
+                timeout = null; // 進入存檔即不再算「待存」，onSnapshot 才不會被永久擋住
                 if (!db || !currentTripId.value || ignoreRemoteUpdate) return;
                 syncStatus.value = 'syncing';
                 try {
@@ -838,7 +896,8 @@ createApp({
             updateExchangeRate, localDateStr, fmtExpDate,
             weather, getTimePeriod,
             updateDate, showSetupModal, setup, initTrip, weatherDisplay, detectRate, isRateLoading, currencyLabel, currencySymbol, toggleFlightCard, getDotColor,
-            showTripMenu, tripList, createNewTrip, switchTrip, deleteTrip, currentTripId,
+            showTripMenu, tripList, createNewTrip, switchTrip, archiveTrip, currentTripId,
+            allTrips, allTripsStatus, showArchivedTrips, loadAllTrips, otherTrips, archivedTrips, adoptTrip, unarchiveTrip,
             openEditModal, cancelSetupModal, isEditing, mapProviderLabel, amountInputRef, isAmountInvalid, itemInputRef, isItemInvalid, isUrl,
             editingState,
             savedLocations,

@@ -12,6 +12,12 @@
 
 ---
 
+## 2026-07-18（同步上游：echo 修復＋「所有旅程」＋封存制 ✅ v41）
+- 上游真機驗收通過（至 9ec957a／sw v41）後同步，三檔整檔覆蓋（index.html／sw.js／app.js），app.js 覆蓋後重做去敏化三件套（vue pin 3.5.13、config 改 import './firebase-config.js'、errorMap not-configured＋onMounted 守衛）。
+- 內容：①**echo 資料遺失修復**——onSnapshot handler 本地有待存變更即跳過遠端快照（`if (timeout) return`）＋debouncedSave 進入存檔即 `timeout = null`，自己存檔的 ACK 不再吃掉 debounce 窗內新變更；②**「所有旅程」區塊**——旅程抽屜下方一次列出 Firestore 全部旅程（首開 getDocs、session 快取、手動重新整理），點卡加入我的清單；③**封存制**——「刪除旅程」全面改封存（`archived:true` merge，無真刪路徑），即點即封存＋undo toast，所有旅程卡片可直接封存，「已封存 (N)」收合列可取回；④全新用戶 setup modal 有「先看看現有旅程」入口。
+- 驗證：`node --check` 過；密鑰掃描（三組樣式）零殘留；與上游 diff 僅 22 行＝去敏化足跡；CDN pin 全保留。
+- oss 用戶影響：升級後既有「刪除」語意變成封存（資料保留在自己的 Firebase 裡）；新欄位 `archived` 免遷移（缺欄位＝正常）。
+
 ## 2026-07-18（同步上游：素材替換工具包＋壓縮素材＋清單重置改單人 ✅ v38）
 - 上游真機驗收通過（至 ac1f636／sw v38）後同步。
 - **素材替換工具包**：新增 `tools/`（`assets-spec.mjs` 24 檔單一真相源＋`check.mjs` 全量驗收含孤兒檔偵測＋`replace.mjs` 吃新圖壓規格覆蓋原檔並自動 bump sw、icon 特例產 192/512；三個 .test.mjs）＋`docs/ASSETS.md` 人讀對照表；README 加「🎨 更換素材」章節——**這就是換掉 Sanrio 素材的正式機制**。既有 `.gitignore` 的 `node_modules/` 已涵蓋 tools/node_modules，未另加規則。
