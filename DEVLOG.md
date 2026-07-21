@@ -12,6 +12,11 @@
 
 ---
 
+## 2026-07-21（.gitignore 補 AI 工具本地產物 🧹）
+- 本 repo 為**公開**鏡像，`.claude/` 一直未追蹤也未忽略——哪天誰 `git add -A` 就會整包進公開 repo（2026-07-07 Windows 機推過 AI context 檔的前科）。`.gitignore` 補上 `.claude/` 與 `.worktrees/`（後者為預防性，對齊私有版）。
+- 順帶查到 `.claude/worktrees/setup-guide-page/` 是**仍註冊**的 git worktree（分支 `worktree-setup-guide-page` @ `0dd8a99`，另有一筆未提交的 `docs/index.html` 改動），且**未併入 main**。逐行比對確認：該分支獨有 8 行全是**舊版**渲染邏輯（扁平 `<ul>/<ol>` 無縮排處理、連結無協定檢查），main 獨有 21 行才是最終審查後的版本（縮排子清單＋`javascript:` 協定白名單，`4c3d2b` 修的兩個 bug）——**main 嚴格較新，該分支已被完全取代，無內容遺失風險**。清除與否待 Benson 決定。
+- 教訓：精簡版 SDD 當時改成「直接在 main commit」，worktree 分支就此變成孤兒卻沒人收——**改變執行模式時要順手清掉原模式留下的 worktree**。
+
 ## 2026-07-21（上游同步：修 PWA 更新 banner 首訪誤報 v49 ✅）
 - 上游 bug：全新使用者（或清過站台資料者）第一次開站就被跳「有新版本 ✨」banner，但他們載入的本來就是最新版；reload 後自癒，屬語意錯誤而非功能損壞。
 - 根因：`index.html` 三條 banner 觸發路徑中只有 `onupdatefound` 有 `navigator.serviceWorker.controller` 守衛，`controllerchange` 與 `SW_UPDATED` message 兩條沒有。`sw.js` 的 `skipWaiting()`＋`clients.claim()`＋對 client 廣播 `SW_UPDATED` 在**首次安裝**照樣走完（`matchAll({type:'window'})` 預設只回受控 client，claim 之後恰好找得到）→ 首訪必中那兩條。

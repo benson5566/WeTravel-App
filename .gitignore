@@ -4,3 +4,7 @@ node_modules/
 *.log
 *.tmp
 tools/backup/
+
+# AI 工具本地產物（本 repo 為公開鏡像，勿隨 `git add -A` 誤入）
+.claude/
+.worktrees/
