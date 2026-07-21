@@ -2,10 +2,53 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WeTravel 自架教學</title>
+<style>
+  :root { --pink: #e8467c; --bg: #fff7f9; --line: #f3d3de; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Microsoft JhengHei", sans-serif; background: var(--bg); color: #333; line-height: 1.7; }
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 720px); gap: 40px; max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; }
+  #toc-toggle { display: none; width: 100%; text-align: left; font: inherit; font-size: 15px; padding: 10px 14px;
+                border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--pink); cursor: pointer; margin-bottom: 8px; }
+  #toc { font-size: 14px; }
+  #toc a { display: block; padding: 6px 0 6px 10px; color: #333; text-decoration: none; border-left: 2px solid transparent; }
+  #toc a.active, #toc a:hover { color: var(--pink); border-left-color: var(--pink); }
+  #content h1 { font-size: 28px; margin-bottom: 8px; }
+  #content h2 { font-size: 22px; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: #222; }
+  #content h3 { font-size: 18px; margin-top: 28px; }
+  #content h4 { font-size: 15px; margin-top: 20px; }
+  #content p { margin: 14px 0; }
+  #content a { color: var(--pink); }
+  #content code { background: #fff0f5; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  #content pre { position: relative; background: #2b2b2b; color: #f5f5f5; padding: 16px; border-radius: 10px; overflow-x: auto; }
+  #content pre code { background: none; padding: 0; color: inherit; }
+  #content blockquote { margin: 16px 0; padding: 2px 16px; border-left: 3px solid var(--pink); color: #666; background: #fff; }
+  #content hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+  #content ul, #content ol { padding-left: 22px; }
+  .copy-btn { position: absolute; top: 10px; right: 10px; font: inherit; font-size: 12px; padding: 4px 10px;
+              border-radius: 6px; border: 1px solid var(--pink); background: #2b2b2b; color: var(--pink); cursor: pointer; }
+  .copy-btn:hover { background: var(--pink); color: #fff; }
+  .fallback { padding: 24px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+  @media (min-width: 769px) {
+    #toc { position: sticky; top: 40px; align-self: start; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; padding: 20px 16px 60px; }
+    #toc-toggle { display: block; }
+    #toc { max-height: 0; overflow: hidden; }
+    #toc.open { max-height: 60vh; overflow-y: auto; margin-bottom: 16px; }
+  }
+</style>
 </head>
 <body>
-<div id="content"><p>載入中…</p></div>
+<div class="layout">
+  <aside>
+    <button id="toc-toggle" type="button">📖 目錄 ▾</button>
+    <nav id="toc" aria-label="章節目錄"></nav>
+  </aside>
+  <main id="content"><p>載入中…</p></main>
+</div>
 <script>
 'use strict';
 
@@ -98,9 +141,24 @@ function renderMarkdown(md) {
   return out.join('\n');
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-  // 完整頁面邏輯（fetch、TOC、複製鈕）在後續任務加入
-});
+function renderFallback() {
+  return '<div class="fallback"><p>⚠️ 無法載入教學內容(可能是直接用瀏覽器打開檔案,或網路已斷線)。</p>'
+    + '<p>請改到 GitHub 閱讀原始檔:<a href="https://github.com/benson5566/WeTravel-App/blob/main/docs/SETUP.md" target="_blank" rel="noopener">SETUP.md</a></p></div>';
+}
+
+async function init() {
+  const container = document.getElementById('content');
+  try {
+    const res = await fetch('./SETUP.md');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const md = await res.text();
+    container.innerHTML = renderMarkdown(md);
+  } catch (err) {
+    container.innerHTML = renderFallback();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
