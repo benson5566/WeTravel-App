@@ -17,6 +17,7 @@
 - 「🚀 上線更新」＝oss 用戶免指令部署：換完圖按鈕亮起，照步驟卡把 assets＋sw.js 拖回自己 repo 的 GitHub 上傳頁，Pages 自動重佈。repo 網址存瀏覽器 localStorage，不進檔案。
 - 文件：SETUP.md 新增**第 8 章「換素材＋更新上線」**（裝 Node→載 ZIP→雙擊工具→換圖→拖回 GitHub 全圖解）、附錄 D 改指向第 8 章；README「更換素材」改 GUI 為主、CLI 收進 details。`.gitignore` 加 `tools/backup/`。
 - 驗證：oss 內 `npm test` **13 測全綠**（含 .bat ASCII＋CRLF 位元組不變式）；密鑰掃描（三組樣式）零殘留；bat hexdump 確認 CRLF 完好。
+- **補遺（同日稍後）**：全量 diff 覆核揪出 `docs/ASSETS.md` 前次 cp 清單漏列（DEVLOG 寫了覆蓋、實際沒做）→ 已補同步（`0b3d1c2`），現與上游逐位元組一致；app.js 差異覆核＝22 行去敏化足跡吻合歷史記錄。
 
 ## 2026-07-21（還原素材上傳測試 ✅——維持「素材不換」定案）
 - Benson 真機測試上游 GUI 工具的「上線更新」流程時，把 5 張測試圖＋sw.js 拖上了本 repo（`8d4aa96`）——流程驗證成功，但測試圖蓋掉 Sanrio 素材與檔頭素材政策不符。
