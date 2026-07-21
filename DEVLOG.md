@@ -14,7 +14,7 @@
 
 ## 2026-07-21（.gitignore 補 AI 工具本地產物 🧹）
 - 本 repo 為**公開**鏡像，`.claude/` 一直未追蹤也未忽略——哪天誰 `git add -A` 就會整包進公開 repo（2026-07-07 Windows 機推過 AI context 檔的前科）。`.gitignore` 補上 `.claude/` 與 `.worktrees/`（後者為預防性，對齊私有版）。
-- 順帶查到 `.claude/worktrees/setup-guide-page/` 是**仍註冊**的 git worktree（分支 `worktree-setup-guide-page` @ `0dd8a99`，另有一筆未提交的 `docs/index.html` 改動），且**未併入 main**。逐行比對確認：該分支獨有 8 行全是**舊版**渲染邏輯（扁平 `<ul>/<ol>` 無縮排處理、連結無協定檢查），main 獨有 21 行才是最終審查後的版本（縮排子清單＋`javascript:` 協定白名單，`4c3d2b` 修的兩個 bug）——**main 嚴格較新，該分支已被完全取代，無內容遺失風險**。清除與否待 Benson 決定。
+- 順帶查到 `.claude/worktrees/setup-guide-page/` 是**仍註冊**的 git worktree（分支 `worktree-setup-guide-page` @ `0dd8a99`，另有一筆未提交的 `docs/index.html` 改動），且**未併入 main**。逐行比對確認：該分支獨有 8 行全是**舊版**渲染邏輯（扁平 `<ul>/<ol>` 無縮排處理、連結無協定檢查），main 獨有 21 行才是最終審查後的版本（縮排子清單＋`javascript:` 協定白名單，`4c3d2b` 修的兩個 bug）——**main 嚴格較新，該分支已被完全取代，無內容遺失風險**。→ Benson 拍板清除，已執行 `git worktree remove --force`＋`git branch -D worktree-setup-guide-page`（原 HEAD `0dd8a99`，短期內仍可經 reflog 救回），空的 `.claude/worktrees/` 一併移除；`.claude/` 現在只剩 `settings.local.json`。
 - 教訓：精簡版 SDD 當時改成「直接在 main commit」，worktree 分支就此變成孤兒卻沒人收——**改變執行模式時要順手清掉原模式留下的 worktree**。
 
 ## 2026-07-21（上游同步：修 PWA 更新 banner 首訪誤報 v49 ✅）
