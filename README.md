@@ -66,7 +66,14 @@ python3 -m http.server 8000
 
 ## 🎨 更換素材（把預設圖換成你自己的）
 
-所有 UI 圖片（splash、吉祥物、導覽列圖示、頭像、PWA icon…共 24 檔）都可以直接替換，**不用改任何程式碼**：
+所有 UI 圖片（splash、吉祥物、導覽列圖示、頭像、PWA icon…共 24 檔）都可以直接替換，**不用改任何程式碼、不用打指令**：
+
+**圖形介面（推薦）**——需先安裝 [Node.js](https://nodejs.org)（LTS 版）：
+- **Windows**：把專案下載到電腦（Code → Download ZIP → 解壓），雙擊「`換素材工具.bat`」，瀏覽器會自動打開素材牆——拖圖進格子、調裁切、按「確認替換」即完成；換錯按「還原上一版」。
+- **Mac／Linux**：`cd tools && npm install`（第一次）後 `node gui.mjs`。
+- 換完按工具右上角「🚀 上線更新」，照步驟卡把 `assets` 資料夾＋`sw.js` 拖回 GitHub 上傳頁，1–2 分鐘後你的網站自動更新。零基礎完整教學見 [`docs/SETUP.md`](./docs/SETUP.md) 第 8 章。
+
+<details><summary>進階：指令列換圖</summary>
 
 1. 查 [`docs/ASSETS.md`](./docs/ASSETS.md) 對照表，找到你要換的檔名與建議尺寸
 2. 執行替換工具（自動裁切壓縮成規格、自動 bump Service Worker 版本）：
@@ -76,6 +83,7 @@ python3 -m http.server 8000
    node replace.mjs icon <你的新圖路徑>     # PWA icon 特例，一次產出 192/512 兩檔
    ```
 3. 全量驗收：`node check.mjs`（24 檔規格全綠即可部署）
+</details>
 
 > 注意：預設素材含 Hello Kitty／Sanrio 圖像，僅供個人自用示範；公開部署請務必換成你自己的素材。
 

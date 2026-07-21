@@ -54,8 +54,8 @@ export async function encodeToSpec(srcPath, spec) {
   return { buf, warnings };
 }
 
-function bumpSwCache() {
-  const swPath = path.join(REPO_ROOT, 'sw.js');
+export function bumpSwCache(root = REPO_ROOT) {
+  const swPath = path.join(root, 'sw.js');
   const sw = readFileSync(swPath, 'utf8');
   const m = sw.match(/const CACHE_NAME = 'wetravel-v(\d+)';/);
   if (!m) {

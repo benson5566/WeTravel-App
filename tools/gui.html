@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WeTravel 素材替換工具</title>
+<style>
+  :root { --pink: #e8467c; --bg: #fff7f9; --card: #ffffff; --line: #f3d3de; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, "Microsoft JhengHei", sans-serif; background: var(--bg); color: #333; }
+  header { position: sticky; top: 0; background: var(--card); border-bottom: 2px solid var(--line);
+           padding: 12px 20px; display: flex; align-items: center; gap: 16px; z-index: 5; }
+  h1 { font-size: 18px; color: var(--pink); }
+  #statusbar { font-size: 14px; padding: 4px 12px; border-radius: 999px; background: #e8f6ec; }
+  #statusbar.bad { background: #fdeaea; }
+  #notices { padding: 8px 20px 0; font-size: 13px; color: #a05a00; }
+  #wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+          gap: 14px; padding: 16px 20px 40px; }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 14px;
+          padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .card.over { border-color: var(--pink); background: #fff0f5; }
+  .card.problem { border-color: #e05252; }
+  .thumb { height: 110px; display: flex; align-items: center; justify-content: center;
+           background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0 / 16px 16px; border-radius: 8px; }
+  .thumb img { max-width: 100%; max-height: 100%; }
+  .use { font-size: 14px; font-weight: 700; }
+  .dim { font-size: 12px; color: #888; }
+  .probs span { display: block; font-size: 12px; color: #c0392b; }
+  .actions { display: flex; gap: 8px; margin-top: auto; }
+  button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+           border: 1px solid var(--pink); background: var(--card); color: var(--pink); }
+  button.primary { background: var(--pink); color: #fff; }
+  button:disabled { opacity: .5; cursor: wait; }
+  #deploy:disabled { opacity: .4; cursor: not-allowed; }
+  .sheet input { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--line);
+                 border-radius: 8px; margin-top: 6px; }
+  .sheet ol { padding-left: 22px; font-size: 14px; display: grid; gap: 6px; margin-top: 8px; }
+  .dp-err { font-size: 13px; color: #c0392b; margin-top: 4px; min-height: 1em; }
+  .dp-note { font-size: 13px; color: #888; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45);
+           display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .modal.hidden { display: none; }
+  .sheet { background: var(--card); border-radius: 16px; padding: 16px; max-width: 560px; width: 94vw; }
+  .sheet h2 { font-size: 16px; margin-bottom: 8px; }
+  #cv { width: 100%; border-radius: 8px; background: #222; touch-action: none; display: block; }
+  #ed-hints div { font-size: 13px; color: #a05a00; margin-top: 6px; }
+  .sheet .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  .hint-drag { font-size: 12px; color: #888; margin-top: 6px; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+           background: #333; color: #fff; padding: 10px 18px; border-radius: 999px;
+           font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>WeTravel 素材替換工具</h1>
+  <div id="statusbar">載入中…</div>
+  <button id="deploy" disabled title="這次有換過素材才會亮起">🚀 上線更新</button>
+</header>
+<div id="notices"></div>
+<main id="wall"></main>
+
+<div id="editor" class="modal hidden">
+  <div class="sheet">
+    <h2 id="ed-title"></h2>
+    <canvas id="cv" width="520" height="420"></canvas>
+    <div class="hint-drag">拖動圖片調整位置、滾輪或雙指縮放；粉紅框內＝會被裁下的範圍</div>
+    <div id="ed-hints"></div>
+    <div class="row">
+      <button id="ed-rotate">旋轉 90°</button>
+      <button id="ed-cancel">取消</button>
+      <button id="ed-ok" class="primary">確認替換</button>
+    </div>
+  </div>
+</div>
+
+<div id="deploy-modal" class="modal hidden">
+  <div class="sheet">
+    <h2>🚀 上線更新（GitHub Pages）</h2>
+    <div id="dp-ask">
+      <div class="dp-note">第一次使用：貼上你的 GitHub 專案網址（會記住，之後一鍵直達）</div>
+      <input id="dp-url" placeholder="https://github.com/你的帳號/WeTravel-App">
+      <div id="dp-err" class="dp-err"></div>
+    </div>
+    <div id="dp-have" class="dp-note" hidden>上傳目標：<span id="dp-url-show"></span></div>
+    <ol>
+      <li>按「開啟上傳頁」（會開新分頁到 GitHub，需已登入）</li>
+      <li>把 <b>assets</b> 資料夾＋<b>sw.js</b> 一起拖進上傳區（有換 icon 再加 icon-192.png、icon-512.png）</li>
+      <li>按綠色「Commit changes」，等 1–2 分鐘網站就會自動更新</li>
+    </ol>
+    <div class="row">
+      <button id="dp-change">換個網址</button>
+      <button id="dp-close">關閉</button>
+      <button id="dp-open" class="primary">開啟上傳頁</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="picker" accept="image/*" hidden>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+// 直接雙擊本檔（file://）沒有伺服器，什麼都動不了——給明確指路而不是死白頁
+if (location.protocol === 'file:') {
+  document.getElementById('wall').innerHTML =
+    '<div style="grid-column:1/-1;background:var(--card);border:2px solid var(--line);border-radius:14px;padding:20px;font-size:15px;line-height:1.8">'
+    + '⚠️ 這個頁面不能直接開啟——它需要工具伺服器。<br>'
+    + '<b>Windows</b>：請關掉這分頁，改雙擊 repo 根目錄的「<b>換素材工具.bat</b>」，瀏覽器會自動開啟正確頁面。<br>'
+    + '<b>Mac／Linux</b>：終端機執行 <code>cd tools && node gui.mjs</code>。</div>';
+  document.getElementById('statusbar').textContent = '未啟動';
+  throw new Error('file:// 直開，停止初始化');
+}
+let state = null;
+let currentSlot = null;
+
+// ———— 素材牆 ————
+async function loadState(s) {
+  state = s || await (await fetch('/api/state')).json();
+  renderStatus();
+  renderWall();
+}
+
+function renderStatus() {
+  const bad = state.check.results.filter((r) => !r.ok).length + state.check.orphans.length;
+  const el = $('statusbar');
+  el.textContent = bad ? `⚠️ ${bad} 項有問題（見紅框卡片）` : `✅ ${state.check.results.length} 張全部合格`;
+  el.className = bad ? 'bad' : '';
+  $('deploy').disabled = !state.dirty;
+}
+
+function slotProblems(slot) {
+  const files = slot.icon ? ['icon-192.png', 'icon-512.png'] : [slot.file];
+  return state.check.results.filter((r) => files.includes(r.file) && !r.ok).flatMap((r) => r.problems);
+}
+
+function renderWall() {
+  const wall = $('wall');
+  wall.textContent = '';
+  for (const slot of state.slots) {
+    const probs = slotProblems(slot);
+    const card = document.createElement('div');
+    card.className = 'card' + (probs.length ? ' problem' : '');
+    const imgFile = slot.icon ? 'icon-192.png' : slot.file;
+    card.innerHTML = `
+      <div class="thumb"><img src="/asset/${encodeURIComponent(imgFile)}?t=${slot.mtime}" alt=""></div>
+      <div class="use"></div>
+      <div class="dim">${slot.icon ? '192×192＋512×512' : `${slot.w}×${slot.h}`}${slot.alpha ? '・需透明背景' : ''}</div>
+      <div class="probs">${probs.map(() => '<span></span>').join('')}</div>
+      <div class="actions">
+        <button class="pick">選擇圖片…</button>
+        ${slot.hasBackup ? '<button class="restore">還原上一版</button>' : ''}
+      </div>`;
+    card.querySelector('.use').textContent = slot.use;
+    card.querySelectorAll('.probs span').forEach((el, i) => { el.textContent = probs[i]; });
+    card.querySelector('.pick').onclick = () => { currentSlot = slot; $('picker').value = ''; $('picker').click(); };
+    const restoreBtn = card.querySelector('.restore');
+    if (restoreBtn) restoreBtn.onclick = () => restore(slot);
+    card.ondragover = (e) => { e.preventDefault(); card.classList.add('over'); };
+    card.ondragleave = () => card.classList.remove('over');
+    card.ondrop = (e) => {
+      e.preventDefault(); card.classList.remove('over');
+      const f = e.dataTransfer.files[0];
+      if (f) openEditor(slot, f);
+    };
+    wall.appendChild(card);
+  }
+}
+
+$('picker').onchange = () => {
+  if ($('picker').files[0] && currentSlot) openEditor(currentSlot, $('picker').files[0]);
+};
+
+async function restore(slot) {
+  const res = await fetch(`/api/restore?target=${encodeURIComponent(slot.file)}`, { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) { alert(data.error); return; }
+  toast('已還原上一版');
+  loadState(data.state);
+}
+
+function toast(msg) {
+  $('toast').textContent = msg;
+  $('toast').classList.add('show');
+  setTimeout(() => $('toast').classList.remove('show'), 2500);
+}
+
+// ———— 🚀 上線更新（oss 用戶免指令部署：GitHub 網頁拖曳上傳）————
+const REPO_KEY = 'wt_repo_url';
+
+function renderDeploy() {
+  const saved = localStorage.getItem(REPO_KEY);
+  $('dp-ask').hidden = !!saved;
+  $('dp-have').hidden = !saved;
+  $('dp-change').hidden = !saved;
+  if (saved) $('dp-url-show').textContent = saved;
+  $('dp-err').textContent = '';
+}
+
+// 只收 https://github.com/<帳號>/<repo>；尾斜線與 .git 順手去掉
+function normalizeRepo(raw) {
+  const url = raw.trim().replace(/\.git$/, '').replace(/\/+$/, '');
+  return /^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(url) ? url : null;
+}
+
+$('deploy').onclick = () => { renderDeploy(); $('deploy-modal').classList.remove('hidden'); };
+$('dp-close').onclick = () => $('deploy-modal').classList.add('hidden');
+$('dp-change').onclick = () => { localStorage.removeItem(REPO_KEY); renderDeploy(); };
+$('dp-open').onclick = () => {
+  let repo = localStorage.getItem(REPO_KEY);
+  if (!repo) {
+    repo = normalizeRepo($('dp-url').value);
+    if (!repo) { $('dp-err').textContent = '網址要長這樣：https://github.com/你的帳號/專案名稱'; return; }
+    localStorage.setItem(REPO_KEY, repo);
+    renderDeploy();
+  }
+  window.open(`${repo}/upload/main`, '_blank');
+};
+
+// ———— 預覽編輯器 ————
+const cv = $('cv');
+const ctx = cv.getContext('2d');
+const ed = {}; // slot, file, bmp, rot, rotCanvas, frame, scale, minScale, panX, panY
+
+async function openEditor(slot, file) {
+  let bmp;
+  try {
+    bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    alert('這個檔案不是可用的圖片');
+    return;
+  }
+  Object.assign(ed, { slot, file, bmp, rot: 0 });
+  buildRotCanvas();
+  fitEditor();
+  $('ed-title').textContent = `更換：${slot.use}`;
+  $('editor').classList.remove('hidden');
+  updateHints();
+  draw();
+}
+
+function specDims() {
+  return ed.slot.icon ? { w: 512, h: 512 } : { w: ed.slot.w, h: ed.slot.h };
+}
+
+function buildRotCanvas() {
+  const { bmp, rot } = ed;
+  const c = document.createElement('canvas');
+  const swap = rot % 180 !== 0;
+  c.width = swap ? bmp.height : bmp.width;
+  c.height = swap ? bmp.width : bmp.height;
+  const g = c.getContext('2d');
+  g.translate(c.width / 2, c.height / 2);
+  g.rotate((rot * Math.PI) / 180);
+  g.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+  ed.rotCanvas = c;
+}
+
+function fitEditor() {
+  const { w, h } = specDims();
+  const M = 30;
+  const ar = w / h;
+  let fw = cv.width - M * 2;
+  let fh = fw / ar;
+  if (fh > cv.height - M * 2) { fh = cv.height - M * 2; fw = fh * ar; }
+  ed.frame = { x: (cv.width - fw) / 2, y: (cv.height - fh) / 2, w: fw, h: fh };
+  const rc = ed.rotCanvas;
+  ed.minScale = Math.max(fw / rc.width, fh / rc.height);
+  ed.scale = ed.minScale;
+  ed.panX = ed.frame.x - (rc.width * ed.scale - fw) / 2;
+  ed.panY = ed.frame.y - (rc.height * ed.scale - fh) / 2;
+}
+
+function clampPan() {
+  const { frame: f, rotCanvas: rc, scale } = ed;
+  ed.panX = Math.min(f.x, Math.max(f.x + f.w - rc.width * scale, ed.panX));
+  ed.panY = Math.min(f.y, Math.max(f.y + f.h - rc.height * scale, ed.panY));
+}
+
+function draw() {
+  const { rotCanvas: rc, scale, panX, panY, frame: f } = ed;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.globalAlpha = 0.35;
+  ctx.drawImage(rc, panX, panY, rc.width * scale, rc.height * scale);
+  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(f.x, f.y, f.w, f.h);
+  ctx.clip();
+  ctx.drawImage(rc, panX, panY, rc.width * scale, rc.height * scale);
+  ctx.restore();
+  ctx.strokeStyle = '#e8467c';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(f.x, f.y, f.w, f.h);
+}
+
+// 拖動＋滾輪／雙指縮放（座標一律用 canvas 內部座標，防 CSS 縮放偏移）
+function canvasPos(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: ((e.clientX - r.left) / r.width) * cv.width, y: ((e.clientY - r.top) / r.height) * cv.height };
+}
+const pointers = new Map();
+cv.onpointerdown = (e) => { cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, canvasPos(e)); };
+cv.onpointerup = cv.onpointercancel = (e) => pointers.delete(e.pointerId);
+cv.onpointermove = (e) => {
+  if (!pointers.has(e.pointerId)) return;
+  const prev = pointers.get(e.pointerId);
+  const cur = canvasPos(e);
+  if (pointers.size === 1) {
+    ed.panX += cur.x - prev.x;
+    ed.panY += cur.y - prev.y;
+    clampPan();
+    draw();
+  } else if (pointers.size === 2) {
+    const otherId = [...pointers.keys()].find((id) => id !== e.pointerId);
+    const other = pointers.get(otherId);
+    const d0 = Math.hypot(prev.x - other.x, prev.y - other.y);
+    const d1 = Math.hypot(cur.x - other.x, cur.y - other.y);
+    if (d0 > 0) zoomAt((cur.x + other.x) / 2, (cur.y + other.y) / 2, d1 / d0);
+  }
+  pointers.set(e.pointerId, cur);
+};
+cv.onwheel = (e) => { e.preventDefault(); const p = canvasPos(e); zoomAt(p.x, p.y, e.deltaY < 0 ? 1.1 : 1 / 1.1); };
+
+function zoomAt(cx, cy, factor) {
+  const ns = Math.min(ed.minScale * 8, Math.max(ed.minScale, ed.scale * factor));
+  const k = ns / ed.scale;
+  ed.panX = cx - (cx - ed.panX) * k;
+  ed.panY = cy - (cy - ed.panY) * k;
+  ed.scale = ns;
+  clampPan();
+  draw();
+}
+
+$('ed-rotate').onclick = () => {
+  ed.rot = (ed.rot + 90) % 360;
+  buildRotCanvas();
+  fitEditor();
+  updateHints();
+  draw();
+};
+$('ed-cancel').onclick = () => $('editor').classList.add('hidden');
+
+async function updateHints() {
+  const hints = [];
+  const { w, h } = specDims();
+  const rc = ed.rotCanvas;
+  if (rc.width < w || rc.height < h) hints.push('來源解析度低於目標尺寸，放大可能會糊');
+  if (ed.slot.alpha && looksOpaque()) {
+    hints.push('這格需要透明背景，這張圖看起來整張不透明——換上去會變一塊實心方形。可先用免費線上去背工具（搜「remove background」）處理後再回來。');
+  }
+  $('ed-hints').innerHTML = hints.map((t) => `<div>⚠ ${t}</div>`).join('');
+}
+
+function looksOpaque() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.drawImage(ed.rotCanvas, 0, 0, 64, 64);
+  const d = g.getImageData(0, 0, 64, 64).data;
+  for (let i = 3; i < d.length; i += 4) if (d[i] < 255) return false;
+  return true;
+}
+
+$('ed-ok').onclick = async () => {
+  const { frame: f, scale, panX, panY, rotCanvas: rc, slot } = ed;
+  const spec = specDims();
+  let x = Math.max(0, Math.round((f.x - panX) / scale));
+  let y = Math.max(0, Math.round((f.y - panY) / scale));
+  let w = Math.min(rc.width - x, Math.round(f.w / scale));
+  let h = Math.min(rc.height - y, Math.round(w * (spec.h / spec.w)));
+  w = Math.min(w, Math.round(h * (spec.w / spec.h))); // 邊界裁掉後回頭校比例（守後端 1% 檢查）
+  const q = new URLSearchParams({ target: slot.file, rotate: ed.rot, x, y, w, h });
+  const btn = $('ed-ok');
+  btn.disabled = true;
+  btn.textContent = '處理中…';
+  try {
+    const res = await fetch(`/api/replace?${q}`, { method: 'POST', body: ed.file });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    $('editor').classList.add('hidden');
+    toast(data.warnings.length ? `✅ 已替換（${data.warnings.length} 項提醒，見上方）` : '✅ 已替換');
+    $('notices').innerHTML = data.warnings.map((t) => `<div>⚠ ${t}</div>`).join('');
+    loadState(data.state);
+  } catch {
+    alert('連不上工具伺服器——啟動視窗是不是關掉了？');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '確認替換';
+  }
+};
+
+loadState();
+</script>
+</body>
+</html>

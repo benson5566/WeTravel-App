@@ -6,7 +6,7 @@
   "description": "WeTravel 素材替換工具包（就地覆蓋制）",
   "scripts": {
     "check": "node check.mjs",
-    "test": "node spec.test.mjs && node check.test.mjs && node replace.test.mjs"
+    "test": "node spec.test.mjs && node check.test.mjs && node replace.test.mjs && node gui.test.mjs"
   },
   "dependencies": {
     "sharp": "0.35.3"
