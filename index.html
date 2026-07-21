@@ -1733,6 +1733,11 @@
         }
 
         if ('serviceWorker' in navigator) {
+            // 本次載入「一開始就有沒有 SW 在控管」——必須在 register/claim 之前取值（此處為腳本解析時，早於 load）。
+            // 首訪（或清過站台資料）時為 false：此時 sw 的 skipWaiting()+clients.claim() 同樣會觸發
+            // controllerchange 與 SW_UPDATED，但頁面載入的本來就是最新版，跳「有新版本」是誤報。
+            const __hadController = !!navigator.serviceWorker.controller;
+
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js').then(registration => {
                     console.log('SW registered: ', registration);
@@ -1767,14 +1772,14 @@
                     console.log('SW registration failed: ', registrationError);
                 });
 
-                // 新 SW 接管時 → 顯示提示，不強制重整
+                // 新 SW 接管時 → 顯示提示，不強制重整（首次安裝的 claim 不算更新）
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    __showUpdateBanner();
+                    if (__hadController) __showUpdateBanner();
                 });
 
-                // 監聽 SW 主動發送的更新通知
+                // 監聽 SW 主動發送的更新通知（同上，首次安裝的 activate 廣播不算更新）
                 navigator.serviceWorker.addEventListener('message', (event) => {
-                    if (event.data && event.data.type === 'SW_UPDATED') {
+                    if (event.data && event.data.type === 'SW_UPDATED' && __hadController) {
                         __showUpdateBanner();
                     }
                 });
@@ -1798,7 +1803,7 @@
         })();
     </script>
 
-    <script type="module" src="./app.js?v=36"></script>
+    <script type="module" src="./app.js?v=37"></script>
 
     <script>
         setTimeout(() => {

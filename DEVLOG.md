@@ -12,6 +12,14 @@
 
 ---
 
+## 2026-07-21（上游同步：修 PWA 更新 banner 首訪誤報 v49 ✅）
+- 上游 bug：全新使用者（或清過站台資料者）第一次開站就被跳「有新版本 ✨」banner，但他們載入的本來就是最新版；reload 後自癒，屬語意錯誤而非功能損壞。
+- 根因：`index.html` 三條 banner 觸發路徑中只有 `onupdatefound` 有 `navigator.serviceWorker.controller` 守衛，`controllerchange` 與 `SW_UPDATED` message 兩條沒有。`sw.js` 的 `skipWaiting()`＋`clients.claim()`＋對 client 廣播 `SW_UPDATED` 在**首次安裝**照樣走完（`matchAll({type:'window'})` 預設只回受控 client，claim 之後恰好找得到）→ 首訪必中那兩條。
+- 修法：在 `if ('serviceWorker' in navigator)` 區塊內、`load` 監聽器之外（腳本解析時，早於 register/claim）取 `const __hadController = !!navigator.serviceWorker.controller;`，兩條無守衛路徑加上它。**取值點不能放 claim 之後**——claim 後 controller 必為真，當下取值等於沒守衛。
+- 同步範圍：`index.html`、`sw.js` 兩檔。同步前先 diff 確認兩檔與上游**除本次改動外位元組全同**（firebase 設定走 `firebase-config.js` 佔位檔、不在這兩檔內），去敏化防線無破口；同步後再掃一次 `index.html` 確認零金鑰樣式命中。
+- 版本：`CACHE_NAME` v48→v49、`app.js?v=` 36→37（自架者更新 fork 後 PWA 才抓得到新版）。
+- 驗證（上游做）：無頭 Playwright＋persistent profile 連跑「首訪」與「回訪且有新版」兩情境，新版 sw 以伺服器端在回應尾端加註解模擬。修前首訪誤報可穩定重現，修後 5/5 全過——首訪無 banner、零 pageerror，且有新版時 banner 仍正常出現（防過度抑制）。
+
 ## 2026-07-21（說明頁驗收回饋：兩個失效連結＋Firebase 主控台改版用詞 ✅）
 - Benson 實看網頁版回報六處。**失效連結根因**：SETUP.md 的相對連結是照 repo 檔案結構寫的（`../README.md`、`../firestore.rules`），但網頁版從 Pages 根目錄（＝`/docs`）渲染，`../` 會解析到站外 → 404。改為絕對 GitHub blob 網址，**GitHub 原始檔檢視與網頁版兩邊都通**。教訓：SETUP.md 同時要在兩種脈絡下閱讀，跨目錄相對連結一律用絕對網址。
 - **Firebase 主控台介面已改版**，五處用詞更新：3.1 建立專案鈕改「請設定 Firebase 專案／建立新的 Firebase 專案」；3.2 左側選單「建構」→**安全性**；3.3 左側選單「建構」→**資料庫和儲存空間**；3.3 區域 `asia-east1` 標示「彰化」→**臺灣**；4.1 齒輪位置「專案總覽旁邊→專案設定」→**下方齒輪（設定）→一般**。
