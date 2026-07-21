@@ -12,6 +12,14 @@
 
 ---
 
+## 2026-07-21（上游同步：移除「今日主題」單日日期輸入 v50 ✅）
+- 上游 bug（真機回報）：碰「今日主題」卡片右上角會叫出 iOS 原生日曆，選日期會**弄壞行程日期**。該處是一個 `opacity-0` 的隱形 `<input type="date">` 疊在卡片右上，點到卡片右上就等於點到它。
+- 根因：`updateDate()` 是全 app **唯一**能單獨改一天日期的路徑，一改就破壞 `days` 的連續日期不變式（`days[i].fullDate === setup.startDate + i 天`，只由 `initTrip()` 兩條批次路徑連貫寫入）。連鎖打壞三處：①`openEditModal()` 拿 `days[0].fullDate` 當 `setup.startDate`，使用者下次按「編輯行程」儲存時 `initTrip()` 照連續規則重寫全部日期，手改那天被沖掉 ②`weatherDisplay` 用 `fullDate` 比對預報陣列 ③首載「跳到今天」用 `fullDate` 比對定位。
+- 加碼發現：該隱形 input **是整份文件第一個 `input[type="date"]`，且行程頁一直在 DOM 裡**——連設定彈窗開著時它都排在彈窗的 Start Date 之前。無頭測試填「第一個 date input」會打到它而非彈窗欄位，實證它會搶輸入。
+- 修法：移除 `index.html` 的 input 與其 `pointer-events-none` 日曆裝飾圖示，及 `app.js` 的 `updateDate()` 定義**與 return 的 export**（只刪定義沒刪 export ＝ ReferenceError 會讓 Vue 掛不起來）。保留全域 `input[type="date"]` CSS（設定彈窗與記帳還要用）。改日期正途＝「編輯行程」的起始日＋天數整批重算，不受影響。
+- 同步範圍：`index.html`／`sw.js` 先 diff 確認與上游**除本次改動外位元組全同**後直接覆蓋；`app.js` **不整份覆蓋**（本 repo 有 3 處刻意分歧：設定檔佔位 import、`not-configured` 錯誤訊息與守衛）→ 只外科式移除兩段。同步後驗證：`updateDate` 殘留 0、金鑰樣式掃描零命中、`app.js` 語法檢查過。
+- 版本：`CACHE_NAME` v49→v50、`app.js?v=` 37→38（自架者更新 fork 後 PWA 才抓得到新版）。
+
 ## 2026-07-21（.gitignore 補 AI 工具本地產物 🧹）
 - 本 repo 為**公開**鏡像，`.claude/` 一直未追蹤也未忽略——哪天誰 `git add -A` 就會整包進公開 repo（2026-07-07 Windows 機推過 AI context 檔的前科）。`.gitignore` 補上 `.claude/` 與 `.worktrees/`（後者為預防性，對齊私有版）。
 - 順帶查到 `.claude/worktrees/setup-guide-page/` 是**仍註冊**的 git worktree（分支 `worktree-setup-guide-page` @ `0dd8a99`，另有一筆未提交的 `docs/index.html` 改動），且**未併入 main**。逐行比對確認：該分支獨有 8 行全是**舊版**渲染邏輯（扁平 `<ul>/<ol>` 無縮排處理、連結無協定檢查），main 獨有 21 行才是最終審查後的版本（縮排子清單＋`javascript:` 協定白名單，`4c3d2b` 修的兩個 bug）——**main 嚴格較新，該分支已被完全取代，無內容遺失風險**。→ Benson 拍板清除，已執行 `git worktree remove --force`＋`git branch -D worktree-setup-guide-page`（原 HEAD `0dd8a99`，短期內仍可經 reflog 救回），空的 `.claude/worktrees/` 一併移除；`.claude/` 現在只剩 `settings.local.json`。

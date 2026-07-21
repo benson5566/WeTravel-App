@@ -165,7 +165,6 @@ createApp({
         };
         const getDotColor = (t) => { if (t === 'food') return 'bg-orange-400 border-orange-100 ring-2 ring-orange-50'; if (t === 'shop') return 'bg-pink-400 border-pink-100 ring-2 ring-pink-50'; if (t === 'transport' || t === 'flight') return 'bg-blue-500 border-blue-100 ring-2 ring-blue-50'; return 'bg-primary-500 border-primary-100 ring-2 ring-primary-50'; };
         const updateParticipants = () => { participants.value = participantsStr.value.split(',').map(s => s.trim()).filter(s => s); };
-        const updateDate = (e, day) => { const val = e.target.value; if (!val) return; day.fullDate = val; const [y, m, d] = val.split('-').map(Number); const dt = new Date(y, m - 1, d); const w = ['日', '一', '二', '三', '四', '五', '六'][dt.getDay()]; day.date = `${m < 10 ? '0' + m : m}/${d < 10 ? '0' + d : d} (${w})`; day.shortDate = `${m}/${d}`; };
         const isUrl = (str) => { if (!str) return false; try { new URL(str); return true; } catch { return /^https?:\/\//i.test(str); } };
 
         // ---- 新增/編輯統一走底部彈窗（draft 草稿制：儲存才寫回，取消不留痕）----
@@ -895,7 +894,7 @@ createApp({
             newParticipant, addParticipant, removeParticipant,
             updateExchangeRate, localDateStr, fmtExpDate,
             weather, getTimePeriod,
-            updateDate, showSetupModal, setup, initTrip, weatherDisplay, detectRate, isRateLoading, currencyLabel, currencySymbol, toggleFlightCard, getDotColor,
+            showSetupModal, setup, initTrip, weatherDisplay, detectRate, isRateLoading, currencyLabel, currencySymbol, toggleFlightCard, getDotColor,
             showTripMenu, tripList, createNewTrip, switchTrip, archiveTrip, currentTripId,
             allTrips, allTripsStatus, showArchivedTrips, loadAllTrips, otherTrips, archivedTrips, adoptTrip, unarchiveTrip,
             openEditModal, cancelSetupModal, isEditing, mapProviderLabel, amountInputRef, isAmountInvalid, itemInputRef, isItemInvalid, isUrl,

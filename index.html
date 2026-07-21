@@ -521,9 +521,7 @@
                                         class="ph-bold ph-pencil-simple text-lg"></i></button>
                             </div>
                         </div>
-                        <input type="date" :value="currentDay.fullDate" @change="updateDate($event, currentDay)"
-                            class="absolute top-2 right-2 w-6 h-6 opacity-0 cursor-pointer">
-                        <i class="ph-bold ph-calendar absolute top-4 right-4 text-stone-300 pointer-events-none"></i>
+                        <!-- 單日日期輸入已移除（v50）：會破壞 days 連續日期不變式，改日期一律走「編輯行程」的 startDate -->
                     </div>
 
                     <!-- Flight Card -->
@@ -1803,7 +1801,7 @@
         })();
     </script>
 
-    <script type="module" src="./app.js?v=37"></script>
+    <script type="module" src="./app.js?v=38"></script>
 
     <script>
         setTimeout(() => {
