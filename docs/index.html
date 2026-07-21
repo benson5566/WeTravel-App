@@ -141,6 +141,52 @@ function renderMarkdown(md) {
   return out.join('\n');
 }
 
+function buildToc(container) {
+  const toc = document.getElementById('toc');
+  const headings = container.querySelectorAll('h2[id]');
+  const links = [];
+  headings.forEach((h) => {
+    const a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+    a.addEventListener('click', () => {
+      document.getElementById('toc').classList.remove('open');
+    });
+    toc.appendChild(a);
+    links.push(a);
+  });
+  return links;
+}
+
+function setupScrollSpy(container, tocLinks) {
+  const byId = new Map(tocLinks.map((a) => [a.getAttribute('href').slice(1), a]));
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const link = byId.get(entry.target.id);
+      if (!link || !entry.isIntersecting) return;
+      tocLinks.forEach((a) => a.classList.remove('active'));
+      link.classList.add('active');
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  container.querySelectorAll('h2[id]').forEach((h) => observer.observe(h));
+}
+
+function setupCopyButtons(container) {
+  container.querySelectorAll('pre').forEach((pre) => {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '複製';
+    btn.addEventListener('click', async () => {
+      const code = pre.querySelector('code');
+      await navigator.clipboard.writeText(code ? code.textContent : '');
+      btn.textContent = '已複製';
+      setTimeout(() => { btn.textContent = '複製'; }, 1500);
+    });
+    pre.appendChild(btn);
+  });
+}
+
 function renderFallback() {
   return '<div class="fallback"><p>⚠️ 無法載入教學內容(可能是直接用瀏覽器打開檔案,或網路已斷線)。</p>'
     + '<p>請改到 GitHub 閱讀原始檔:<a href="https://github.com/benson5566/WeTravel-App/blob/main/docs/SETUP.md" target="_blank" rel="noopener">SETUP.md</a></p></div>';
@@ -153,6 +199,12 @@ async function init() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const md = await res.text();
     container.innerHTML = renderMarkdown(md);
+    const tocLinks = buildToc(container);
+    setupScrollSpy(container, tocLinks);
+    setupCopyButtons(container);
+    document.getElementById('toc-toggle').addEventListener('click', () => {
+      document.getElementById('toc').classList.toggle('open');
+    });
   } catch (err) {
     container.innerHTML = renderFallback();
   }
