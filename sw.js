@@ -1,9 +1,16 @@
-const CACHE_NAME = 'wetravel-v41';
+const CACHE_NAME = 'wetravel-v48';
 const ASSETS = [
   './index.html',
   './manifest.json',
-  'https://unpkg.com/@phosphor-icons/web@2.1.1',
-  'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js',
+  './vendor/tailwind-3.4.16.js',
+  './vendor/vue-3.5.13.esm-browser.prod.js',
+  './vendor/sortable-1.15.6.min.js',
+  './vendor/phosphor/bold/style.css',
+  './vendor/phosphor/bold/Phosphor-Bold.woff2',
+  './vendor/phosphor/fill/style.css',
+  './vendor/phosphor/fill/Phosphor-Fill.woff2',
+  './vendor/phosphor/duotone/style.css',
+  './vendor/phosphor/duotone/Phosphor-Duotone.woff2',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Sans+TC:wght@300;400;500;700&display=swap'
 ];
 

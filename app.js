@@ -1,5 +1,5 @@
 
-import { createApp, ref, computed, watch, onMounted, nextTick, reactive } from 'https://unpkg.com/vue@3.5.13/dist/vue.esm-browser.js'
+import { createApp, ref, computed, watch, onMounted, nextTick, reactive } from './vendor/vue-3.5.13.esm-browser.prod.js'
 
 // Firebase 設定改由外部檔案提供：自架者請編輯 firebase-config.js
 import { firebaseConfig } from './firebase-config.js';

@@ -7,16 +7,18 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>WeTravel | 雲端直連版</title>
     <link rel="icon" href="./icon-192.png">
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <!-- Tailwind CSS（self-host，供應鏈收編 2026-07-21）-->
+    <script src="./vendor/tailwind-3.4.16.js"></script>
     <!-- Google Fonts -->
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
         rel="stylesheet">
-    <!-- Phosphor Icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
-    <!-- SortableJS -->
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+    <!-- Phosphor Icons（self-host；app 只用 bold/fill/duotone 三權重，原 CDN loader 會拉六個）-->
+    <link rel="stylesheet" href="./vendor/phosphor/bold/style.css">
+    <link rel="stylesheet" href="./vendor/phosphor/fill/style.css">
+    <link rel="stylesheet" href="./vendor/phosphor/duotone/style.css">
+    <!-- SortableJS（self-host）-->
+    <script src="./vendor/sortable-1.15.6.min.js"></script>
 
     <style>
         [v-cloak] {
@@ -1796,7 +1798,7 @@
         })();
     </script>
 
-    <script type="module" src="./app.js?v=35"></script>
+    <script type="module" src="./app.js?v=36"></script>
 
     <script>
         setTimeout(() => {

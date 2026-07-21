@@ -12,6 +12,12 @@
 
 ---
 
+## 2026-07-21（同步上游：前端依賴全面 self-host ✅ v48）
+- 供應鏈收編：`vendor/` 收 tailwind 3.4.16＋vue 3.5.13 esm prod＋sortablejs 1.15.6＋phosphor 2.1.1（bold/fill/duotone 三權重 CSS+字型），第三方 CDN（unpkg/jsdelivr/tailwindcss.com）歸零；Google Fonts＋firebase gstatic 留 CDN（信任邊界＝只信 Google 基礎設施）。自架者好處：不再依賴第三方 CDN 存活與誠實，斷網開發也行。
+- index.html/sw.js 整檔覆蓋（sw v48、ASSETS 全本地含 woff2 預快取）；app.js **二進位模式**手術替換 vue import（保 CRLF 行尾——文字模式讀寫會靜默 LF 化，踩過）。與上游 diff 降至 20 行＝純去敏化足跡。
+- 驗證：`node --check` 過；密鑰掃描零殘留；上游無頭煙霧全綠後才同步。
+- 另備份工具三檔（backup-trips/restore-trip/backup.test）隨上游 package.json 一併同步，oss 自架者可備份自己的 Firebase（金鑰自動從 firebase-config.js 抽取）。
+
 ## 2026-07-21（資安盤點→firestore.rules 補 deny delete ✅）
 - 全面資安盤點（兩 repo 工作樹＋git 全歷史＋作者資訊＋XSS/SRI 檢查）後唯一實質補強：規則層 `write` 原本隱含允許 delete，但 App 已是封存制、無正當刪除路徑——改為 `allow read, create, update` ＋ `allow delete: if false`，防止繞過 App 直接 deleteDoc 毀損資料。App 行為零影響（setDoc merge＝create/update、REST PATCH＝update）。
 - 自架用戶升級方式：Firebase Console → Firestore → 規則 → 貼上新版 → 發布。
