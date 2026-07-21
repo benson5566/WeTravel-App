@@ -12,6 +12,15 @@
 
 ---
 
+## 2026-07-21（Task 4：oss 說明頁——側欄目錄＋捲動高亮＋程式碼複製鈕 ✅）
+- 實作「文件導覽增強」三函式，串接 Task 3 的 DOM 結構＆渲染器：
+  - `buildToc(container)`：掃描 `h2[id="ch-N"]` 元素自動建目錄、鏈結含手機版點擊收合；
+  - `setupScrollSpy(container, tocLinks)`：IntersectionObserver 監聽捲動位置、即時高亮目前章節（`.active` class）；
+  - `setupCopyButtons(container)`：每個 code block 加複製鈕（`navigator.clipboard.writeText`）、複製成功 1.5s 改文案回饋。
+- init() 串接三函式＋目錄按鈕（手機版展開 `.open` class）；CSS 既存已備工具樣式。
+- 迴歸驗證（Task 1-3）：`npm test` 二測全綠；煙霧測試四項一次到位（heading count 27✓ / toc link 10✓ / copy button ✓ / console errors ✓）與實檔 grep 驗證吻合。
+- Commit: `35444be` feat(docs): oss 說明頁——側欄目錄＋捲動高亮＋程式碼複製鈕
+
 ## 2026-07-21（同步上游：前端依賴全面 self-host ✅ v48）
 - 供應鏈收編：`vendor/` 收 tailwind 3.4.16＋vue 3.5.13 esm prod＋sortablejs 1.15.6＋phosphor 2.1.1（bold/fill/duotone 三權重 CSS+字型），第三方 CDN（unpkg/jsdelivr/tailwindcss.com）歸零；Google Fonts＋firebase gstatic 留 CDN（信任邊界＝只信 Google 基礎設施）。自架者好處：不再依賴第三方 CDN 存活與誠實，斷網開發也行。
 - index.html/sw.js 整檔覆蓋（sw v48、ASSETS 全本地含 woff2 預快取）；app.js **二進位模式**手術替換 vue import（保 CRLF 行尾——文字模式讀寫會靜默 LF 化，踩過）。與上游 diff 降至 20 行＝純去敏化足跡。
