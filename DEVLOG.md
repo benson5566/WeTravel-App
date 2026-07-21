@@ -12,6 +12,12 @@
 
 ---
 
+## 2026-07-21（說明頁驗收回饋：兩個失效連結＋Firebase 主控台改版用詞 ✅）
+- Benson 實看網頁版回報六處。**失效連結根因**：SETUP.md 的相對連結是照 repo 檔案結構寫的（`../README.md`、`../firestore.rules`），但網頁版從 Pages 根目錄（＝`/docs`）渲染，`../` 會解析到站外 → 404。改為絕對 GitHub blob 網址，**GitHub 原始檔檢視與網頁版兩邊都通**。教訓：SETUP.md 同時要在兩種脈絡下閱讀，跨目錄相對連結一律用絕對網址。
+- **Firebase 主控台介面已改版**，五處用詞更新：3.1 建立專案鈕改「請設定 Firebase 專案／建立新的 Firebase 專案」；3.2 左側選單「建構」→**安全性**；3.3 左側選單「建構」→**資料庫和儲存空間**；3.3 區域 `asia-east1` 標示「彰化」→**臺灣**；4.1 齒輪位置「專案總覽旁邊→專案設定」→**下方齒輪（設定）→一般**。
+- 驗證：三組單元測試全綠；渲染後確認兩連結皆為 `target="_blank" rel="noopener"` 的可用外部連結。
+- 同時釐清（無需改動）：Node.js 只在第 8 章換素材用，第 0–7 章自架全程不需要；oss `app.js` 已走 `import './firebase-config.js'`（僅 `YOUR_` 佔位值），無真實金鑰；Firebase web config 本就是公開識別碼、非密鑰，防護靠 firestore.rules。
+
 ## 2026-07-21（oss 說明頁 GitHub Pages 已啟用並驗證 ✅）
 - `gh api repos/benson5566/WeTravel-App/pages` 開啟 main `/docs` 來源；curl 驗證 `https://benson5566.github.io/WeTravel-App/` 與其 `SETUP.md` 皆 200 且內容正確。
 - 至此本輪 spec（`2026-07-21-setup-guide-page-design.md`）四項交付全部完成：`docs/index.html`／README 導流／GitHub Pages／DEVLOG。
