@@ -33,6 +33,8 @@ export async function buildState(root) {
     const p = path.join(root, s.dir, s.files[0]);
     return {
       file: s.file, use: s.use, w: s.w, h: s.h, alpha: !!s.alpha, icon: s.icon,
+      // shape: null＝禁用形狀裁切；undefined（省略）正規化為 0＝方形
+      shape: s.shape === undefined ? 0 : s.shape,
       mtime: existsSync(p) ? Math.round(statSync(p).mtimeMs) : 0,
       hasBackup: s.files.every((f) => existsSync(path.join(root, BACKUP_DIR, f))),
     };
@@ -41,9 +43,15 @@ export async function buildState(root) {
 }
 
 export async function replaceAsset(root, target, buffer, opts = {}) {
-  const { rotate = 0, rect = null } = opts;
+  const { rotate = 0, rect = null, radius = 0 } = opts;
   if (![0, 90, 180, 270].includes(rotate)) throw new GuiError(400, '旋轉角度必須是 0／90／180／270');
+  if (!Number.isInteger(radius) || radius < 0 || radius > 50) {
+    throw new GuiError(400, '形狀百分比必須是 0 到 50 的整數');
+  }
   const specs = specsFor(target);
+  if (radius > 0 && specs[0].shape === null) {
+    throw new GuiError(400, '這個素材不支援形狀裁切');
+  }
 
   // 前置管線：EXIF 轉正＋使用者旋轉＋裁切，處理完交給既有 encodeToSpec（壓縮／警告不變）
   let prepared;
@@ -63,6 +71,28 @@ export async function replaceAsset(root, target, buffer, opts = {}) {
     const want = specs[0].w / specs[0].h;
     if (Math.abs(w / h - want) / want > 0.01) throw new GuiError(400, '裁切比例不符，請重新選取');
     prepared = await sharp(prepared).extract({ left: x, top: y, width: w, height: h }).toBuffer();
+  }
+
+  // 圓角遮罩：套在裁切後、encodeToSpec（縮放＋壓縮）之前。
+  // 位置選在這裡的理由：encodeToSpec 超標時會走 palette 量化，其 tRNS 保得住透明角；
+  // 反過來若等壓縮完再切，就得重編碼、繞過那套降級邏輯。
+  if (radius > 0) {
+    const m = await sharp(prepared).metadata();
+    const want = specs[0].w / specs[0].h;
+    if (Math.abs(m.width / m.height - want) / want > 0.01) {
+      // 比例不符時 encodeToSpec 會 cover 裁切，把剛切好的圓角削掉一塊 → 擋掉而非產出歪形狀
+      throw new GuiError(400, '要套用圓角必須先選好裁切範圍（比例需符合素材規格）');
+    }
+    const r = (radius / 100) * Math.min(m.width, m.height); // 50 ⇒ 短邊一半 ⇒ 正圓
+    const mask = Buffer.from(
+      `<svg width="${m.width}" height="${m.height}">`
+      + `<rect x="0" y="0" width="${m.width}" height="${m.height}" rx="${r}" ry="${r}" fill="#fff"/></svg>`,
+    );
+    prepared = await sharp(prepared)
+      .ensureAlpha() // 來源若無 alpha 通道，dest-in 無處寫入透明度
+      .composite([{ input: mask, blend: 'dest-in' }])
+      .png({ palette: false })
+      .toBuffer();
   }
 
   // 先全部編碼成功，才動任何檔案（備份＝寫檔前原檔 的不變式）
@@ -151,7 +181,7 @@ export function createServer(root) {
           ? { x: +p.get('x'), y: +p.get('y'), w: +p.get('w'), h: +p.get('h') }
           : null;
         const out = await replaceAsset(root, p.get('target'), body, {
-          rotate: +(p.get('rotate') || 0), rect,
+          rotate: +(p.get('rotate') || 0), rect, radius: +(p.get('radius') || 0),
         });
         dirty = true;
         out.state.dirty = dirty;

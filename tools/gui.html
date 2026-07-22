@@ -46,6 +46,11 @@
   #ed-hints div { font-size: 13px; color: #a05a00; margin-top: 6px; }
   .sheet .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
   .hint-drag { font-size: 12px; color: #888; margin-top: 6px; }
+  .shape-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; }
+  .shape-row input[type=range] { flex: 1; accent-color: #e8467c; }
+  .shape-row input[type=range]:disabled { opacity: .4; }
+  .shape-val { min-width: 76px; text-align: right; color: #555; font-variant-numeric: tabular-nums; }
+  .shape-off { font-size: 12px; color: #888; }
   #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
            background: #333; color: #fff; padding: 10px 18px; border-radius: 999px;
            font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
@@ -66,6 +71,12 @@
     <h2 id="ed-title"></h2>
     <canvas id="cv" width="520" height="420"></canvas>
     <div class="hint-drag">拖動圖片調整位置、滾輪或雙指縮放；粉紅框內＝會被裁下的範圍</div>
+    <div class="shape-row">
+      <label for="ed-shape">形狀</label>
+      <input id="ed-shape" type="range" min="0" max="50" step="1" value="0">
+      <span id="ed-shape-val" class="shape-val">方形</span>
+    </div>
+    <div id="ed-shape-off" class="shape-off hidden"></div>
     <div id="ed-hints"></div>
     <div class="row">
       <button id="ed-rotate">旋轉 90°</button>
@@ -77,7 +88,7 @@
 
 <div id="deploy-modal" class="modal hidden">
   <div class="sheet">
-    <h2>🚀 上線更新（GitHub Pages）</h2>
+    <h2>🚀 上線更新</h2>
     <div id="dp-ask">
       <div class="dp-note">第一次使用：貼上你的 GitHub 專案網址（會記住，之後一鍵直達）</div>
       <input id="dp-url" placeholder="https://github.com/你的帳號/WeTravel-App">
@@ -88,6 +99,7 @@
       <li>按「開啟上傳頁」（會開新分頁到 GitHub，需已登入）</li>
       <li>把 <b>assets</b> 資料夾＋<b>sw.js</b> 一起拖進上傳區（有換 icon 再加 icon-192.png、icon-512.png）</li>
       <li>按綠色「Commit changes」，等 1–2 分鐘網站就會自動更新</li>
+      <li>想確認進度，到該專案的 <b>Actions</b> 分頁看最新那筆是不是綠勾</li>
     </ol>
     <div class="row">
       <button id="dp-change">換個網址</button>
@@ -233,7 +245,19 @@ async function openEditor(slot, file) {
     alert('這個檔案不是可用的圖片');
     return;
   }
-  Object.assign(ed, { slot, file, bmp, rot: 0 });
+  // shape: null＝該格禁用形狀裁切（目前僅 BG_Loading）
+  Object.assign(ed, { slot, file, bmp, rot: 0, radius: slot.shape === null ? 0 : (slot.shape || 0) });
+  const sl = $('ed-shape');
+  sl.disabled = slot.shape === null;
+  sl.value = ed.radius;
+  const off = $('ed-shape-off');
+  if (slot.shape === null) {
+    off.textContent = '這格是滿版啟動背景，不需要形狀';
+    off.classList.remove('hidden');
+  } else {
+    off.classList.add('hidden');
+  }
+  updateShapeLabel();
   buildRotCanvas();
   fitEditor();
   $('ed-title').textContent = `更換：${slot.use}`;
@@ -244,6 +268,24 @@ async function openEditor(slot, file) {
 
 function specDims() {
   return ed.slot.icon ? { w: 512, h: 512 } : { w: ed.slot.w, h: ed.slot.h };
+}
+
+// 滑桿右側文字：0＝方形；50＝正方形素材為正圓、長方形素材為膠囊；其餘顯示百分比
+function updateShapeLabel() {
+  const { w, h } = specDims();
+  const v = ed.radius;
+  $('ed-shape-val').textContent = v === 0 ? '方形'
+    : v === 50 ? (w === h ? '正圓' : '膠囊')
+    : `圓角 ${v}%`;
+}
+
+// 裁切框路徑（預覽用）。半徑公式與後端一致：r = radius/100 * 短邊。不可乘 2。
+function framePath() {
+  const { frame: f } = ed;
+  const r = (ed.radius / 100) * Math.min(f.w, f.h);
+  ctx.beginPath();
+  if (r > 0) ctx.roundRect(f.x, f.y, f.w, f.h, r);
+  else ctx.rect(f.x, f.y, f.w, f.h);
 }
 
 function buildRotCanvas() {
@@ -281,20 +323,20 @@ function clampPan() {
 }
 
 function draw() {
-  const { rotCanvas: rc, scale, panX, panY, frame: f } = ed;
+  const { rotCanvas: rc, scale, panX, panY } = ed;
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.globalAlpha = 0.35;
   ctx.drawImage(rc, panX, panY, rc.width * scale, rc.height * scale);
   ctx.globalAlpha = 1;
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(f.x, f.y, f.w, f.h);
+  framePath();
   ctx.clip();
   ctx.drawImage(rc, panX, panY, rc.width * scale, rc.height * scale);
   ctx.restore();
   ctx.strokeStyle = '#e8467c';
   ctx.lineWidth = 2;
-  ctx.strokeRect(f.x, f.y, f.w, f.h);
+  framePath();
+  ctx.stroke();
 }
 
 // 拖動＋滾輪／雙指縮放（座標一律用 canvas 內部座標，防 CSS 縮放偏移）
@@ -342,6 +384,12 @@ $('ed-rotate').onclick = () => {
   updateHints();
   draw();
 };
+$('ed-shape').oninput = (e) => {
+  ed.radius = +e.target.value;
+  updateShapeLabel();
+  updateHints();
+  draw();
+};
 $('ed-cancel').onclick = () => $('editor').classList.add('hidden');
 
 async function updateHints() {
@@ -351,6 +399,9 @@ async function updateHints() {
   if (rc.width < w || rc.height < h) hints.push('來源解析度低於目標尺寸，放大可能會糊');
   if (ed.slot.alpha && looksOpaque()) {
     hints.push('這格需要透明背景，這張圖看起來整張不透明——換上去會變一塊實心方形。可先用免費線上去背工具（搜「remove background」）處理後再回來。');
+  }
+  if (ed.slot.icon && ed.radius > 0) {
+    hints.push('iOS 不支援桌面圖示透明，切圓角後四角在 iPhone 上可能顯示成黑色；Android 正常。');
   }
   $('ed-hints').innerHTML = hints.map((t) => `<div>⚠ ${t}</div>`).join('');
 }
@@ -373,7 +424,7 @@ $('ed-ok').onclick = async () => {
   let w = Math.min(rc.width - x, Math.round(f.w / scale));
   let h = Math.min(rc.height - y, Math.round(w * (spec.h / spec.w)));
   w = Math.min(w, Math.round(h * (spec.w / spec.h))); // 邊界裁掉後回頭校比例（守後端 1% 檢查）
-  const q = new URLSearchParams({ target: slot.file, rotate: ed.rot, x, y, w, h });
+  const q = new URLSearchParams({ target: slot.file, rotate: ed.rot, x, y, w, h, radius: ed.radius });
   const btn = $('ed-ok');
   btn.disabled = true;
   btn.textContent = '處理中…';

@@ -182,6 +182,154 @@ import { createServer } from './gui.mjs';
   console.log('PASS 上線更新 dirty 旗標');
 }
 
+// —— 形狀裁切（radius）——
+// 半徑公式：r = radius/100 * min(w,h)。50 ⇒ 短邊一半 ⇒ 正方形切出正圓。
+async function alphaAt(file, x, y) {
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  return data[(y * info.width + x) * 4 + 3];
+}
+
+// 準備 icon 兩檔（192／512 皆正方形，方便驗正圓）
+async function makeIconRoot() {
+  const { root } = await makeRoot();
+  for (const f of ['icon-192.png', 'icon-512.png']) {
+    copyFileSync(path.join(root, 'assets', 'bow_pink.png'), path.join(root, f));
+  }
+  return root;
+}
+
+// ⑥ radius:0 與不帶 radius 的輸出必須位元組相同（迴歸保護：關閉狀態零行為改變）
+{
+  const a = await makeRoot();
+  await replaceAsset(a.root, 'bow_pink.png', srcBlue, { rect: { x: 0, y: 0, w: 200, h: 173 } });
+  const b = await makeRoot();
+  await replaceAsset(b.root, 'bow_pink.png', srcBlue, { rect: { x: 0, y: 0, w: 200, h: 173 }, radius: 0 });
+  assert.deepStrictEqual(
+    readFileSync(path.join(a.root, 'assets', 'bow_pink.png')),
+    readFileSync(path.join(b.root, 'assets', 'bow_pink.png')),
+    'radius:0 應與不帶 radius 位元組完全相同',
+  );
+  console.log('PASS radius:0 零行為改變');
+}
+
+// ⑦ radius:50 於正方形素材 → 正圓（角落透明、上緣中點保留、中心保留）
+{
+  const root = await makeIconRoot();
+  await replaceAsset(root, 'icon', srcBlue, { rect: { x: 0, y: 0, w: 300, h: 300 }, radius: 50 });
+  const f = path.join(root, 'icon-192.png');
+  assert.strictEqual(await alphaAt(f, 10, 10), 0, '正圓的角落應完全透明');
+  assert.ok(await alphaAt(f, 96, 1) > 0, '正圓的上緣中點應保留（沒切過頭）');
+  assert.strictEqual(await alphaAt(f, 96, 96), 255, '正圓的中心應不透明');
+  console.log('PASS radius:50 正圓');
+}
+
+// ⑧ radius:20 → 圓角矩形（角落透明但上緣中點附近仍是直邊）
+{
+  const root = await makeIconRoot();
+  await replaceAsset(root, 'icon', srcBlue, { rect: { x: 0, y: 0, w: 300, h: 300 }, radius: 20 });
+  const f = path.join(root, 'icon-192.png');
+  assert.strictEqual(await alphaAt(f, 2, 2), 0, '圓角矩形的角落應透明');
+  assert.strictEqual(await alphaAt(f, 96, 2), 255, '圓角矩形的上緣中點應完全不透明（直邊）');
+  console.log('PASS radius:20 圓角矩形');
+}
+
+// ⑨ radius:50 於長方形素材 → 膠囊（短邊兩端半圓；96x83 的 r=41.5）
+{
+  const { root } = await makeRoot();
+  await replaceAsset(root, 'bow_pink.png', srcBlue, { rect: { x: 0, y: 0, w: 200, h: 173 }, radius: 50 });
+  const f = path.join(root, 'assets', 'bow_pink.png');
+  assert.strictEqual(await alphaAt(f, 2, 2), 0, '膠囊的角落應透明');
+  assert.ok(await alphaAt(f, 1, 41) > 0, '膠囊左緣最寬處（短邊中線）應保留');
+  console.log('PASS radius:50 膠囊');
+}
+
+// ⑩ 參數驗證：範圍外／非整數／非數字一律 400
+{
+  const { root } = await makeRoot();
+  for (const bad of [-1, 51, 12.5, NaN]) {
+    await assert.rejects(
+      replaceAsset(root, 'bow_pink.png', srcBlue, { rect: { x: 0, y: 0, w: 200, h: 173 }, radius: bad }),
+      (e) => e instanceof GuiError && e.status === 400 && e.message.includes('0 到 50'),
+      `radius=${bad} 應 400`,
+    );
+  }
+  console.log('PASS radius 參數驗證');
+}
+
+// ⑪ shape:null 的素材（BG_Loading）禁用形狀裁切
+{
+  const { root } = await makeRoot();
+  await assert.rejects(
+    replaceAsset(root, 'BG_Loading.png', srcBlue, { radius: 30 }),
+    (e) => e instanceof GuiError && e.status === 400 && e.message.includes('不支援形狀裁切'),
+    'BG_Loading 帶 radius 應 400',
+  );
+  console.log('PASS shape:null 禁用');
+}
+
+// ⑫ 比例守衛：radius>0 但來源比例不符規格（且沒給 rect）→ 400，不靜默產出歪形狀
+{
+  const { root } = await makeRoot();
+  await assert.rejects(
+    // srcBlue 是 400x400（比例 1.0），bow_pink 規格 96x83（比例 1.157）
+    replaceAsset(root, 'bow_pink.png', srcBlue, { radius: 50 }),
+    (e) => e instanceof GuiError && e.status === 400 && e.message.includes('裁切範圍'),
+    '比例不符時套圓角應 400',
+  );
+  console.log('PASS 圓角比例守衛');
+}
+
+// ⑬ palette 量化降級後圓角仍透明（守 tRNS 路徑）
+{
+  const root = await makeIconRoot();
+  const noise = Buffer.alloc(512 * 512 * 3);
+  for (let i = 0; i < noise.length; i += 1) noise[i] = Math.floor(Math.random() * 256);
+  const srcNoise = await sharp(noise, { raw: { width: 512, height: 512, channels: 3 } })
+    .png({ palette: false }).toBuffer();
+  const out = await replaceAsset(root, 'icon', srcNoise, { radius: 50 });
+  assert.ok(
+    out.warnings.some((w) => w.includes('自動壓縮')),
+    '雜訊圖應觸發 palette 量化降級（否則本測試沒驗到 tRNS 路徑）',
+  );
+  assert.strictEqual(await alphaAt(path.join(root, 'icon-512.png'), 20, 20), 0, '量化後角落仍應透明');
+  console.log('PASS 量化後圓角保留');
+}
+
+// ⑭ buildState 透出 shape，且 undefined 正規化為 0
+{
+  const { root } = await makeRoot();
+  const st = await buildState(root);
+  const byFile = Object.fromEntries(st.slots.map((s) => [s.file, s]));
+  assert.strictEqual(byFile['icn_head.png'].shape, 50, 'buildState 應透出 shape');
+  assert.strictEqual(byFile['BG_Loading.png'].shape, null, 'null 應原樣透出');
+  assert.strictEqual(byFile['bow_pink.png'].shape, 0, '省略的 shape 應正規化為 0');
+  assert.strictEqual(byFile.icon.shape, 0, 'icon 應可切（預設 0）');
+  console.log('PASS buildState 透出 shape');
+}
+
+// ⑮ HTTP 層傳遞 radius
+{
+  const root = await makeIconRoot();
+  const server = createServer(root);
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  const ok200 = await fetch(`${base}/api/replace?target=icon&rotate=0&x=0&y=0&w=300&h=300&radius=50`, {
+    method: 'POST', body: srcBlue,
+  });
+  assert.strictEqual(ok200.status, 200, '帶 radius 的 replace 應 200');
+  assert.strictEqual(await alphaAt(path.join(root, 'icon-192.png'), 10, 10), 0, 'HTTP 路徑也應切出圓角');
+
+  const bad = await fetch(`${base}/api/replace?target=icon&rotate=0&x=0&y=0&w=300&h=300&radius=99`, {
+    method: 'POST', body: srcBlue,
+  });
+  assert.strictEqual(bad.status, 400, 'radius 超範圍應 400');
+  assert.ok((await bad.json()).error.includes('0 到 50'), '錯誤要人話');
+
+  server.close();
+  console.log('PASS HTTP radius 傳遞');
+}
+
 // —— Windows 入口不變式：.bat 必須純 ASCII＋CRLF ——
 // cmd 對 UTF-8 中文＋LF-only 批次檔會亂碼＋解析錯位（2026-07-21 Benson 真機實證），
 // 中文指引一律放瀏覽器端（gui.html）與文件，bat 只准 ASCII。
